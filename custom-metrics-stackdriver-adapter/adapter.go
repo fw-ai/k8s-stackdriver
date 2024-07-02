@@ -75,9 +75,9 @@ type stackdriverAdapterServerOptions struct {
 	// Default = false, which only list 1 metric. Enabling this back would increase memory usage.
 	ListFullCustomMetrics bool
 	// GceConfig options
-	GcpProject  string
-	GcpLocation string
-	GcpCluster  string
+	ProjectId string
+	Location  string
+	Cluster   string
 }
 
 func (sa *StackdriverAdapter) makeProviderOrDie(o *stackdriverAdapterServerOptions, rateInterval time.Duration, alignmentPeriod time.Duration) (provider.MetricsProvider, *translator.Translator) {
@@ -113,7 +113,6 @@ func (sa *StackdriverAdapter) makeProviderOrDie(o *stackdriverAdapterServerOptio
 	}
 
 	gceConf, err := getGceConfig(o)
-
 	if err != nil {
 		klog.Fatalf("Failed to retrieve GCE config: %v", err)
 	}
@@ -131,11 +130,11 @@ func (sa *StackdriverAdapter) makeProviderOrDie(o *stackdriverAdapterServerOptio
 }
 
 func getGceConfig(o *stackdriverAdapterServerOptions) (*gceconfig.GceConfig, error) {
-	if o.GcpProject != "" {
+	if o.ProjectId != "" {
 		return &gceconfig.GceConfig{
-			Project:  o.GcpProject,
-			Location: o.GcpLocation,
-			Cluster:  o.GcpCluster,
+			Project:  o.ProjectId,
+			Location: o.Location,
+			Cluster:  o.Cluster,
 			Instance: "",
 		}, nil
 	} else {
@@ -230,12 +229,12 @@ func main() {
 	flags.BoolVar(&serverOptions.EnableDistributionSupport, "enable-distribution-support", serverOptions.EnableDistributionSupport,
 		"enables support for scaling based on distribution values")
 	// Custom flags
-	flags.StringVar(&serverOptions.GcpProject, "project-id", "",
-		"Google Cloud Platform Project")
-	flags.StringVar(&serverOptions.GcpCluster, "cluster", "",
-		"Google Cloud Platform Cluster")
-	flags.StringVar(&serverOptions.GcpLocation, "location", "",
-		"Google Cloud Platform Location")
+	flags.StringVar(&serverOptions.ProjectId, "project-id", "",
+		"Project ID of the Google Cloud cluster. May be left empty on GKE.")
+	flags.StringVar(&serverOptions.Cluster, "cluster", "",
+		"Name of the cluster the adapter acts on. May be left empty on GKE.")
+	flags.StringVar(&serverOptions.Location, "location", "",
+		"Google Cloud region or zone where your data is stored. May be left empty on GKE.")
 	flags.Parse(os.Args)
 
 	klog.Info("serverOptions: ", serverOptions)
@@ -271,11 +270,11 @@ func main() {
 		klog.Fatalf("unable to run custom metrics adapter: %v", err)
 	}
 
-	if serverOptions.GcpProject != "" && serverOptions.GcpCluster == "" {
-		klog.Fatalf("When 'project-id' is set, 'cluster' must also be set.")
+	if (serverOptions.Cluster == "") != (serverOptions.ProjectId == "") {
+		klog.Fatalf("'cluster' should be set if and only if 'project-id' is set.")
 	}
-	if serverOptions.GcpProject != "" && serverOptions.GcpLocation == "" {
-		klog.Fatalf("When 'project-id' is set, 'location' must also be set.")
+	if (serverOptions.Location == "") != (serverOptions.ProjectId == "") {
+		klog.Fatalf("'location' should be set if and only if 'project-id' is set.")
 	}
 }
 
