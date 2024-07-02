@@ -230,7 +230,7 @@ func main() {
 		"enables support for scaling based on distribution values")
 	// Custom flags
 	flags.StringVar(&serverOptions.ProjectId, "project-id", "",
-		"Project ID of the Google Cloud cluster. May be left empty on GKE.")
+		"Project ID on Google Cloud. May be left empty on GKE.")
 	flags.StringVar(&serverOptions.Cluster, "cluster", "",
 		"Name of the cluster the adapter acts on. May be left empty on GKE.")
 	flags.StringVar(&serverOptions.Location, "location", "",
