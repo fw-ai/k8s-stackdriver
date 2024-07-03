@@ -249,6 +249,12 @@ func main() {
 	} else {
 		klog.Infof("ListFullCustomMetrics is disabled, which would only list 1 metric resource to reduce memory usage. Add --list-full-custom-metrics to list full metric resources for debugging.")
 	}
+	if (serverOptions.Cluster == "") != (serverOptions.ProjectId == "") {
+		klog.Fatalf("'cluster' should be set if and only if 'project-id' is set.")
+	}
+	if (serverOptions.Location == "") != (serverOptions.ProjectId == "") {
+		klog.Fatalf("'location' should be set if and only if 'project-id' is set.")
+	}
 
 	// TODO(holubwicz): move duration config to server options
 	metricsProvider, translator := cmd.makeProviderOrDie(&serverOptions, 5*time.Minute, 1*time.Minute)
@@ -268,13 +274,6 @@ func main() {
 	}
 	if err := cmd.Run(wait.NeverStop); err != nil {
 		klog.Fatalf("unable to run custom metrics adapter: %v", err)
-	}
-
-	if (serverOptions.Cluster == "") != (serverOptions.ProjectId == "") {
-		klog.Fatalf("'cluster' should be set if and only if 'project-id' is set.")
-	}
-	if (serverOptions.Location == "") != (serverOptions.ProjectId == "") {
-		klog.Fatalf("'location' should be set if and only if 'project-id' is set.")
 	}
 }
 
