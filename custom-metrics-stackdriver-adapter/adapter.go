@@ -74,6 +74,10 @@ type stackdriverAdapterServerOptions struct {
 	// ListFullCustomMetrics is a flag that whether list all pod custom metrics during api discovery.
 	// Default = false, which only list 1 metric. Enabling this back would increase memory usage.
 	ListFullCustomMetrics bool
+	// GceConfig options
+	ProjectId string
+	Location  string
+	Cluster   string
 }
 
 func (sa *StackdriverAdapter) makeProviderOrDie(o *stackdriverAdapterServerOptions, rateInterval time.Duration, alignmentPeriod time.Duration) (provider.MetricsProvider, *translator.Translator) {
@@ -108,7 +112,7 @@ func (sa *StackdriverAdapter) makeProviderOrDie(o *stackdriverAdapterServerOptio
 		stackdriverService.BasePath = o.StackdriverEndpoint
 	}
 
-	gceConf, err := gceconfig.GetGceConfig()
+	gceConf, err := getGceConfig(o)
 	if err != nil {
 		klog.Fatalf("Failed to retrieve GCE config: %v", err)
 	}
@@ -123,6 +127,19 @@ func (sa *StackdriverAdapter) makeProviderOrDie(o *stackdriverAdapterServerOptio
 	// If ListFullCustomMetrics is false, it returns one resource during api discovery `kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta2"` to reduce memory usage.
 	customMetricsListCache := listStackdriverCustomMetrics(translator, o.ListFullCustomMetrics, o.FallbackForContainerMetrics)
 	return adapter.NewStackdriverProvider(client, mapper, gceConf, stackdriverService, translator, rateInterval, o.UseNewResourceModel, o.FallbackForContainerMetrics, customMetricsListCache), translator
+}
+
+func getGceConfig(o *stackdriverAdapterServerOptions) (*gceconfig.GceConfig, error) {
+	if o.ProjectId != "" {
+		return &gceconfig.GceConfig{
+			Project:  o.ProjectId,
+			Location: o.Location,
+			Cluster:  o.Cluster,
+			Instance: "",
+		}, nil
+	} else {
+		return gceconfig.GetGceConfig()
+	}
 }
 
 func listStackdriverCustomMetrics(translator *translator.Translator, listFullCustomMetrics bool, fallbackForContainerMetrics bool) []provider.CustomMetricInfo {
@@ -211,7 +228,13 @@ func main() {
 		"Stackdriver Endpoint used by adapter. Default is https://monitoring.googleapis.com/")
 	flags.BoolVar(&serverOptions.EnableDistributionSupport, "enable-distribution-support", serverOptions.EnableDistributionSupport,
 		"enables support for scaling based on distribution values")
-
+	// Custom flags
+	flags.StringVar(&serverOptions.ProjectId, "project-id", "",
+		"Project ID on Google Cloud. May be left empty on GKE.")
+	flags.StringVar(&serverOptions.Cluster, "cluster", "",
+		"Name of the cluster the adapter acts on. May be left empty on GKE.")
+	flags.StringVar(&serverOptions.Location, "location", "",
+		"Google Cloud region or zone where your data is stored. May be left empty on GKE.")
 	flags.Parse(os.Args)
 
 	klog.Info("serverOptions: ", serverOptions)
@@ -225,6 +248,12 @@ func main() {
 		klog.Infof("ListFullCustomMetrics is enabled, which would increase memory usage a lot. Please keep it as false, unless have to.")
 	} else {
 		klog.Infof("ListFullCustomMetrics is disabled, which would only list 1 metric resource to reduce memory usage. Add --list-full-custom-metrics to list full metric resources for debugging.")
+	}
+	if (serverOptions.Cluster == "") != (serverOptions.ProjectId == "") {
+		klog.Fatalf("'cluster' should be set if and only if 'project-id' is set.")
+	}
+	if (serverOptions.Location == "") != (serverOptions.ProjectId == "") {
+		klog.Fatalf("'location' should be set if and only if 'project-id' is set.")
 	}
 
 	// TODO(holubwicz): move duration config to server options
